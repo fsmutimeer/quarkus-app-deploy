@@ -15,6 +15,7 @@ public class GreetingResource {
         return "Hello from Quarkus REST";
     }
 
+    // hi
     @GET
     @Path("/greets")
     @Produces(MediaType.TEXT_PLAIN)
