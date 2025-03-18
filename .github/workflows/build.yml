@@ -1,0 +1,29 @@
+name: Build, Push & Deploy to OpenShift
+
+on:
+  push:
+    branches:
+      - feroz
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Log in to OpenShift Registry
+        run: |
+          echo "${{ secrets.OPENSHIFT_PASSWORD }}" | docker login -u "${{ secrets.OPENSHIFT_USERNAME }}" --password-stdin image-registry.openshift-image-registry.svc:5000
+
+      - name: Build and Tag Docker Image
+        run: docker build -t image-registry.openshift-image-registry.svc:5000/test-project/quarkus-app:latest .
+
+      - name: Push Image to OpenShift
+        run: docker push image-registry.openshift-image-registry.svc:5000/test-project/quarkus-app:latest
+
+      - name: Restart OpenShift Deployment
+        run: |
+          oc login --token=${{ secrets.OPENSHIFT_TOKEN }} --server=https://console-openshift-console.apps.cl0101.cloud22.io/
+          oc rollout restart deployment/quarkus-app -n test-project
