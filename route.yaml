@@ -1,0 +1,19 @@
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: quarkus-app-route
+  namespace: test-project
+  labels:
+    router: external
+  annotations:
+    openshift.io/host.generated: "true"
+spec:
+  host: el-quarkus-listener-test-project.apps.cl0101.cloud22.io
+  to:
+    kind: Service
+    name: quarkus-app-service
+  port:
+    targetPort: http-listener
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

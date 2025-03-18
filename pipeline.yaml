@@ -1,0 +1,105 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: quarkus-pipeline
+  namespace: test-project
+spec:
+  params:
+    - default: " "
+      description: name of the deployment to be patched
+      name: deployment-name
+      type: string
+    - description: path to Dockerfile
+      name: dockerfile-path
+      type: string
+    - description: url of the git repo for the code of deployment
+      name: git-url
+      type: string
+    - description: url of the git repo for the code of ArgoCD deployment
+      name: deployment-git-url
+      type: string
+    - description: revision to be used from repo of the code for deployment
+      name: git-revision
+      type: string
+    - description: branch of deployment repo need commit in
+      name: git-revision-deploy
+      type: string
+    - description: image to be build from the code
+      name: image-url
+      type: string
+    - description: username for commit
+      name: username
+      type: string
+    - description: useremail for commit
+      name: useremail
+      type: string
+    - name: git-commit-id
+      type: string
+    - default: " "
+      name: image-tag
+      type: string
+  tasks:
+    - name: fetch-repository
+      params:
+        - name: url
+          value: $(params.git-url)
+        - name: subdirectory
+          value: ""
+        - name: deleteExisting
+          value: "true"
+        - name: revision
+          value: $(params.git-revision)
+      taskRef:
+        kind: ClusterTask
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+    - name: build-image
+      params:
+        - name: IMAGE
+          value: $(params.image-url)
+        - name: DOCKERFILE
+          value: $(params.dockerfile-path)
+        - name: git-commit-id
+          value: $(params.git-commit-id)
+      runAfter:
+        - fetch-repository
+      taskRef:
+        kind: ClusterTask
+        name: buildah
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+    - name: commit-deployment-repo
+      params:
+        - name: url
+          value: $(params.deployment-git-url)
+        - name: IMAGE
+          value: $(params.image-url)
+        - name: revision
+          value: $(params.git-revision-deploy)
+        - name: subdirectory
+          value: ""
+        - name: deleteExisting
+          value: "true"
+        - name: username
+          value: $(params.username)
+        - name: useremail
+          value: $(params.useremail)
+        - name: git-commit-id
+          value: $(params.git-commit-id)
+        - name: image-tag
+          value: $(tasks.build-image.results.IMAGE_DIGEST)
+        - name: deployment-name
+          value: $(params.deployment-name)
+      runAfter:
+        - build-image
+      taskRef:
+        kind: ClusterTask
+        name: git-commit
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+  workspaces:
+    - name: shared-workspace
