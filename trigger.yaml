@@ -9,12 +9,8 @@ spec:
     - ref:
         name: "cel"
       params:
-        - name: "overlays"
-          value:
-            - key: X-Hub-Signature
-              expression: "1234567"
         - name: "filter"
-          value: "header.match('X-GitHub-Event', 'push') && body.ref=='refs/heads/feroz' && body.repository.full_name=='fsmutimeer/quarkus-app-deploy'"
+          value: "header.get('X-GitHub-Event') == 'push' && body.ref == 'refs/heads/feroz' && body.repository.full_name == 'fsmutimeer/quarkus-app-deploy'"
   bindings:
     - ref: quarkus-triggerbinding
   template:
