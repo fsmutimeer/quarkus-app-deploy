@@ -23,7 +23,7 @@ jobs:
 
       - name: Log in to OpenShift
         run: |
-          oc login --token=${{ secrets.OPENSHIFT_TOKEN }} --server=https://console-openshift-console.apps.cl0101.cloud22.io/
+          oc login --token=${{ secrets.OPENSHIFT_TOKEN }} --server=https://api.cl0101.cloud22.io:6443
           echo "Logged into OpenShift"
 
       - name: Get OpenShift Registry URL
