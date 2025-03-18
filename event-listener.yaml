@@ -1,9 +1,9 @@
 apiVersion: triggers.tekton.dev/v1beta1
 kind: EventListener
 metadata:
-  name: quarkus-listener
+  name: el-quarkus-listener
 spec:
-  serviceAccountName: tekton-sa
+  serviceAccountName: pipeline
   triggers:
     - name: quarkus-trigger
       bindings:
