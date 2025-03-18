@@ -11,9 +11,9 @@ spec:
   host: el-quarkus-listener-test-project.apps.cl0101.cloud22.io
   to:
     kind: Service
-    name: quarkus-app-service
+    name: el-quarkus-listener
   port:
-    targetPort: http-listener
+    targetPort: 8080
   tls:
     termination: edge
     insecureEdgeTerminationPolicy: Redirect
