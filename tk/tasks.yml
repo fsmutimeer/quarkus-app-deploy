@@ -110,7 +110,10 @@ metadata:
 spec:
   workspaces:
     - name: output
-      description: Directory containing the repository
+      description: Directory containing the source code
+    - name: git-credentials
+      description: Optional git credentials workspace
+      optional: true
   params:
     - name: url
       type: string
@@ -118,6 +121,7 @@ spec:
     - name: revision
       type: string
       description: Branch to commit to
+      default: "main"
     - name: IMAGE
       type: string
       description: Image URL to update in manifests
@@ -133,9 +137,14 @@ spec:
     - name: image-tag
       type: string
       description: Tag to use for the image
+      default: "latest"
     - name: deployment-name
       type: string
       description: Name of the deployment to update
+    - name: manifest-path
+      type: string
+      description: Path to manifest file
+      default: "manifests/$(params.deployment-name).yaml"
   steps:
     - name: commit-changes
       image: alpine/git:latest
@@ -143,20 +152,91 @@ spec:
         #!/bin/sh
         set -ex
         
-        # Configure git
+        # Configure git identity
         git config --global user.name "$(params.username)"
         git config --global user.email "$(params.useremail)"
         
-        # Clone deployment repo
-        git clone "$(params.url)" /tmp/deployment
-        cd /tmp/deployment
+        # Set up credentials if provided
+        if [ -f "$(workspaces.git-credentials.path)/.git-credentials" ]; then
+          git config --global credential.helper \
+            "store --file $(workspaces.git-credentials.path)/.git-credentials"
+        fi
+        
+        # Clone the deployment repo
+        REPO_DIR="/tmp/deployment-$(date +%s)"
+        git clone "$(params.url)" "$REPO_DIR"
+        cd "$REPO_DIR"
         git checkout "$(params.revision)"
         
-        # Update manifests (example - customize for your needs)
-        sed -i "s|image:.*|image: $(params.IMAGE):$(params.image-tag)|g" "manifests/$(params.deployment-name).yaml"
+        # Verify manifest exists
+        if [ ! -f "$(params.manifest-path)" ]; then
+          echo "Error: Manifest file not found at $(params.manifest-path)"
+          ls -la "$(dirname "$(params.manifest-path)")" || true
+          exit 1
+        fi
         
-        # Commit and push
-        git add .
-        git commit -m "Update $(params.deployment-name) to $(params.git-commit-id)"
-        git push origin "$(params.revision)"
+        # Update image reference
+        sed -i.bak \
+          "s|image:.*|image: $(params.IMAGE):$(params.image-tag)|g" \
+          "$(params.manifest-path)"
+        
+        # Commit changes if modified
+        git add "$(params.manifest-path)"
+        if ! git diff --cached --quiet; then
+          git commit -m "Update $(params.deployment-name) to $(params.git-commit-id)"
+          
+          # Retry push up to 3 times
+          for i in 1 2 3; do
+            if git push origin "$(params.revision)"; then
+              echo "Push succeeded"
+              break
+            fi
+            echo "Push attempt $i failed, retrying..."
+            sleep 5
+          done
+        else
+          echo "No changes to commit"
+        fi
 
+---
+
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: buildah
+spec:
+  workspaces:
+    - name: source
+      description: Directory containing source code
+  params:
+    - name: IMAGE
+      type: string
+      description: Image reference to build/push
+    - name: DOCKERFILE
+      type: string
+      description: Path to Dockerfile
+      default: "Dockerfile"
+    - name: git-commit-id
+      type: string
+      description: Git commit SHA (for tagging)
+  steps:
+    - name: build
+      image: quay.io/buildah/stable:v1.23.1
+      securityContext:
+        privileged: true
+      script: |
+        #!/bin/sh
+        set -ex
+        
+        cd "$(workspaces.source.path)"
+        
+        # Build image
+        buildah bud \
+          -t "$(params.IMAGE):$(params.git-commit-id)" \
+          -t "$(params.IMAGE):latest" \
+          -f "$(params.DOCKERFILE)" \
+          .
+        
+        # Push images
+        buildah push "$(params.IMAGE):$(params.git-commit-id)"
+        buildah push "$(params.IMAGE):latest"

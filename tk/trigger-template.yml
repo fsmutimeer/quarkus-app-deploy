@@ -43,7 +43,7 @@ spec:
           - name: git-revision
             value: "$(tt.params.git-revision)"
           - name: image-url
-            value: "image-registry.openshift-image-registry.svc:5000/$(tt.params.deployment-name)/$(tt.params.deployment-name)"
+            value: "image-registry.openshift-image-registry.svc:5000/feroz-shah-dev/$(tt.params.deployment-name)"
         serviceAccountName: pipeline
         workspaces:
           - name: shared-workspace
