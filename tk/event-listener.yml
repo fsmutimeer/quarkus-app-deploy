@@ -1,0 +1,26 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: quarkus-app-listener
+  namespace: feroz-shah-dev
+spec:
+  serviceAccountName: pipeline
+  triggers:
+    - name: quarkus-app-trigger
+      interceptors:
+        - ref:
+            name: "cel"
+          params:
+            - name: "overlays"
+              value:
+                - key: "X-Hub-Signature"
+                  expression: "1234567"
+            - name: "filter"
+              value: |
+                header.match('X-GitHub-Event', 'repo:push') &&
+                body.push.changes[0].new.name == 'feroz' &&
+                body.repository.full_name == 'fsmutimeer/quarkus-app-deploy'
+      bindings:
+        - ref: quarkus-app-binding
+      template:
+        ref: quarkus-app-trigger-template
