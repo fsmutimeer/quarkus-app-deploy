@@ -23,7 +23,7 @@ spec:
           name: quarkus-app-pipeline
         params:
           - name: git-revision
-            value: "refs/heads/feroz" # Hardcoded to your branch
+            value: "feroz" # Hardcoded to your branch
           - name: git-repo-url
             value: "https://github.com/fsmutimeer/quarkus-app-deploy.git"
           - name: image-name
