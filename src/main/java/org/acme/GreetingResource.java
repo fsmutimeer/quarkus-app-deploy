@@ -24,11 +24,4 @@ public class GreetingResource {
         return "Hello from Quarkus REST";
     }
 
-    @GET
-    @Path("/update api")
-    @Produces(MediaType.TEXT_PLAIN)
-    public String updateApi() {
-        return "Hello from Quarkus REST";
-    }
-
 }
