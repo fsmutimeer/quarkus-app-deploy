@@ -37,7 +37,7 @@ spec:
         ls -la
 
 ---
-apiVersion: tekton.dev/v1
+aapiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: buildah
@@ -45,32 +45,44 @@ metadata:
 spec:
   workspaces:
     - name: source
+      description: Directory containing source code and Dockerfile
   params:
     - name: IMAGE
       type: string
-    - name: DOCKERFILE
+      description: Image reference to build/push
+    - name: DOCKERFILE_PATH
+      value: "Dockerfile"  # or your custom path
       type: string
+      description: Path to Dockerfile relative to workspace
       default: "Dockerfile"
   steps:
-    - name: build
+    - name: build-and-push
       image: quay.io/buildah/stable:v1.23.1
       securityContext:
-        runAsUser: 1000  # Non-root user
+        runAsUser: 1000
         capabilities:
-          add: ["SETFCAP"]  # Minimal required capabilities
+          add: ["SETFCAP"]
       script: |
         #!/bin/sh
-        set -e
-        cd "$(workspaces.source.path)"
+        set -ex
         
-        # Build using rootless Buildah
+        # Verify Dockerfile exists
+        DOCKERFILE="$(workspaces.source.path)/$(params.DOCKERFILE_PATH)"
+        if [ ! -f "$DOCKERFILE" ]; then
+          echo "Error: Dockerfile not found at $DOCKERFILE"
+          ls -la "$(workspaces.source.path)"
+          exit 1
+        fi
+
+        # Build with rootless Buildah
         buildah bud \
           --storage-driver=vfs \
-          --format docker \
+          --format=docker \
           -t "$(params.IMAGE)" \
-          -f "$(params.DOCKERFILE)" \
-          .
+          -f "$DOCKERFILE" \
+          "$(workspaces.source.path)"
         
+        # Push the image
         buildah push "$(params.IMAGE)"
 
 ---
