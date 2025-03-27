@@ -1,46 +1,61 @@
----
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: git-clone
+  namespace: feroz-shah-dev
 spec:
-  workspaces:
-    - name: output
-      description: Directory where the repository will be cloned
   params:
     - name: url
       type: string
-      description: Git repository URL
     - name: revision
       type: string
-      description: Git revision (branch/tag/commit)
-      default: "feroz"
+      default: "main"
     - name: subdirectory
       type: string
-      description: Subdirectory within workspace
       default: ""
     - name: deleteExisting
       type: string
-      description: Clean workspace before cloning
-      default: "true"
+      default: "false"
+  workspaces:
+    - name: output
   steps:
     - name: clone
-      image: gcr.io/tekton-releases/github.com/tektoncd/pipeline/cmd/git-init:v0.32.0
+      image: alpine/git
       script: |
         #!/bin/sh
-        set -ex
-        
-        # Clean workspace if requested
+        set -e
         if [ "$(params.deleteExisting)" = "true" ]; then
-          rm -rf "$(workspaces.output.path)/$(params.subdirectory)"/* || true
+          rm -rf $(workspaces.output.path)/$(params.subdirectory)
         fi
-        
-        # Clone repository
-        git clone "$(params.url)" "$(workspaces.output.path)/$(params.subdirectory)"
-        
-        # Checkout specific revision
-        cd "$(workspaces.output.path)/$(params.subdirectory)"
-        git checkout "$(params.revision)"
+        git clone --depth=1 -b $(params.revision) $(params.url) $(workspaces.output.path)/$(params.subdirectory)
+
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: buildah
+  namespace: feroz-shah-dev
+spec:
+  params:
+    - name: IMAGE
+      type: string
+    - name: DOCKERFILE
+      type: string
+    - name: git-commit-id
+      type: string
+  workspaces:
+    - name: source
+  steps:
+    - name: build
+      image: quay.io/buildah/stable
+      securityContext:
+        privileged: true
+      script: |
+        #!/bin/sh
+        set -e
+        cd $(workspaces.source.path)
+        buildah bud -f $(params.DOCKERFILE) -t $(params.IMAGE) .
+        buildah push $(params.IMAGE)
 
 --- 
 
@@ -48,98 +63,37 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: git-commit
+  namespace: feroz-shah-dev
 spec:
-  workspaces:
-    - name: output
-      description: Directory containing the repository
   params:
     - name: url
       type: string
-      description: Git repository URL
     - name: revision
       type: string
-      description: Branch to commit to
-    - name: IMAGE
-      type: string
-      description: Image URL to update in manifests
     - name: username
       type: string
-      description: Git commit username
     - name: useremail
       type: string
-      description: Git commit email
     - name: git-commit-id
       type: string
-      description: Source commit SHA
     - name: image-tag
       type: string
-      description: Tag to use for the image
-    - name: deployment-name
-      type: string
-      description: Name of the deployment to update
-  steps:
-    - name: commit-changes
-      image: alpine/git:latest
-      script: |
-        #!/bin/sh
-        set -ex
-        
-        # Configure git
-        git config --global user.name "$(params.username)"
-        git config --global user.email "$(params.useremail)"
-        
-        # Clone deployment repo
-        git clone "$(params.url)" /tmp/deployment
-        cd /tmp/deployment
-        git checkout "$(params.revision)"
-        
-        # Update manifests (example - customize for your needs)
-        sed -i "s|image:.*|image: $(params.IMAGE):$(params.image-tag)|g" "manifests/$(params.deployment-name).yaml"
-        
-        # Commit and push
-        git add .
-        git commit -m "Update $(params.deployment-name) to $(params.git-commit-id)"
-        git push origin "$(params.revision)"
-
----
-
-apiVersion: tekton.dev/v1beta1
-kind: Task
-metadata:
-  name: buildah
-spec:
-  workspaces:
-    - name: source
-      description: Directory containing source code
-  params:
     - name: IMAGE
       type: string
-      description: Image reference to build/push
-    - name: DOCKERFILE
+    - name: deployment-name
       type: string
-      description: Path to Dockerfile
-      default: "Dockerfile"
-    - name: git-commit-id
-      type: string
-      description: Git commit SHA (for tagging)
+  workspaces:
+    - name: output
   steps:
-    - name: build
-      image: quay.io/buildah/stable:v1.23.1
-      securityContext:
-        privileged: true
+    - name: commit
+      image: alpine/git
       script: |
         #!/bin/sh
-        set -ex
-        
-        cd "$(workspaces.source.path)"
-        
-        # Build image
-        buildah bud \
-          -t "$(params.IMAGE):$(params.git-commit-id)" \
-          -t "$(params.IMAGE):latest" \
-          -f "$(params.DOCKERFILE)" \
-          .
-        
-        # Push images
-        buildah push "$(params.IMAGE):$(params.git-commit-id)"
-        buildah push "$(params.IMAGE):latest"
+        set -e
+        cd $(workspaces.output.path)
+        git config --global user.name "$(params.username)"
+        git config --global user.email "$(params.useremail)"
+        git checkout $(params.revision)
+        echo "Updating deployment with image: $(params.IMAGE):$(params.image-tag)"
+        git commit -am "Updated $(params.deployment-name) deployment with image $(params.IMAGE):$(params.image-tag)"
+        git push origin $(params.revision)
