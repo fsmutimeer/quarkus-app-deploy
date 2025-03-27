@@ -45,34 +45,33 @@ metadata:
 spec:
   workspaces:
     - name: source
-      description: Directory containing source code
   params:
     - name: IMAGE
       type: string
-      description: Image reference to build/push
     - name: DOCKERFILE
       type: string
-      description: Path to Dockerfile
-      default: "."
+      default: "Dockerfile"
   steps:
-    - name: build-and-push
+    - name: build
       image: quay.io/buildah/stable:v1.23.1
       securityContext:
-        privileged: true
+        runAsUser: 1000  # Non-root user
+        capabilities:
+          add: ["SETFCAP"]  # Minimal required capabilities
       script: |
         #!/bin/sh
         set -e
-        
         cd "$(workspaces.source.path)"
-        echo "Building image from $(params.DOCKERFILE)"
+        
+        # Build using rootless Buildah
         buildah bud \
+          --storage-driver=vfs \
+          --format docker \
           -t "$(params.IMAGE)" \
           -f "$(params.DOCKERFILE)" \
           .
         
-        echo "Pushing image to registry..."
         buildah push "$(params.IMAGE)"
-        echo "Image pushed successfully!"
 
 ---
 apiVersion: tekton.dev/v1
