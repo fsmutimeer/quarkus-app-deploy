@@ -8,6 +8,7 @@ import jakarta.ws.rs.core.MediaType;
 @Path("/hello")
 @Produces(MediaType.TEXT_PLAIN)
 public class GreetingResource {
+    // Gretting API
 
     @GET
     @Produces(MediaType.TEXT_PLAIN)
