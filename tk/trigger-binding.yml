@@ -22,6 +22,6 @@ spec:
     - name: useremail
       value: ishpata@hotmail.com
     - name: git-commit-id
-      value: '$(body.push.changes[0].new.target.hash)'
+      value: '$(body.head_commit.id)'
 
 
