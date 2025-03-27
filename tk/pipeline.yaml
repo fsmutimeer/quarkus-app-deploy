@@ -6,6 +6,17 @@ metadata:
 spec:
   workspaces:
     - name: shared-workspace
+  params:
+    - name: git-repo-url
+      type: string
+      default: "https://github.com/fsmutimeer/quarkus-app-deploy.git"
+    - name: git-revision
+      type: string
+      default: "feroz"
+    - name: image-name
+      type: string
+      default: "image-registry.openshift-image-registry.svc:5000/feroz-shah-dev/quarkus-app:latest"
+  
   tasks:
     - name: fetch-source
       taskRef:
@@ -15,9 +26,9 @@ spec:
           workspace: shared-workspace
       params:
         - name: url
-          value: https://github.com/fsmutimeer/quarkus-app-deploy.git
+          value: "$(params.git-repo-url)"
         - name: revision
-          value: feroz
+          value: "$(params.git-revision)"
 
     - name: build-image
       taskRef:
@@ -29,7 +40,7 @@ spec:
           workspace: shared-workspace
       params:
         - name: IMAGE
-          value: image-registry.openshift-image-registry.svc:5000/test-project/be-okr:latest
+          value: "$(params.image-name)"
 
     - name: deploy-app
       taskRef:
@@ -39,4 +50,6 @@ spec:
       params:
         - name: SCRIPT
           value: |
-            oc apply -f /workspace/shared-workspace/k8s/deployment.yaml -n test-project
+            cd $(workspaces.source.path)
+            oc apply -f k8s/deployment.yaml -n feroz-shah-dev
+            oc rollout status deployment/quarkus-app -n feroz-shah-dev --timeout=60s

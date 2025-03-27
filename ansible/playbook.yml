@@ -1,0 +1,34 @@
+---
+- name: Create Pod in OpenShift
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Ensure namespace exists
+      kubernetes.core.k8s:
+        api_version: v1
+        kind: Namespace
+        name: feroz-shah-dev
+        state: present
+        # host: "{{ k8s_host }}"
+        # api_key: "{{ k8s_token }}"
+        validate_certs: false
+      register: ns_result
+      ignore_errors: yes
+
+    - name: Create pod from manifest
+      kubernetes.core.k8s:
+        state: present
+        # host: "{{ k8s_host }}"
+        # api_key: "{{ k8s_token }}"
+        # validate_certs: false
+        src: mypod.yml
+        namespace: feroz-shah-dev
+      register: pod_result
+
+    - name: Show results
+      debug:
+        msg:
+          - "Namespace result: {{ ns_result }}"
+          - "Pod result: {{ pod_result }}"

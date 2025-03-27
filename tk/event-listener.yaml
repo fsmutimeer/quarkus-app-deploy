@@ -1,0 +1,29 @@
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: EventListener
+metadata:
+  name: github-listener
+  namespace: feroz-shah-dev
+spec:
+  serviceAccountName: pipeline
+  triggers:
+    - name: github-push-trigger
+      interceptors:
+        - ref:
+            name: "github"
+          params:
+            - name: "secretRef"
+              value:
+                secretName: "github-webhook-secret"
+                secretKey: "token"
+            - name: "eventTypes"
+              value: ["push"]
+            - name: "githubOwner"
+              value: "fsmutimeer"
+            - name: "githubRepo"
+              value: "quarkus-app-deploy"
+            - name: "branches"
+              value: ["feroz"]
+      bindings:
+        - ref: github-push-binding
+      template:
+        ref: quarkus-pipeline-template
