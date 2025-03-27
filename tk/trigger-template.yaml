@@ -30,9 +30,5 @@ spec:
             value: "image-registry.openshift-image-registry.svc:5000/feroz-shah-dev/quarkus-app:latest"
         workspaces:
           - name: shared-workspace
-            volumeClaimTemplate:
-              spec:
-                accessModes: ["ReadWriteOnce"]
-                resources:
-                  requests:
-                    storage: 1Gi
+            emptyDir: {}
+            
