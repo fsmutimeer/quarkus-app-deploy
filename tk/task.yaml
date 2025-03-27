@@ -1,0 +1,63 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: git-clone
+  namespace: feroz-shah-dev
+spec:
+  workspaces:
+    - name: output
+  params:
+    - name: url
+      type: string
+      description: Git repository URL
+    - name: revision
+      type: string
+      description: Git revision (branch/tag)
+  steps:
+    - name: clone
+      image: gcr.io/tekton-releases/github.com/tektoncd/pipeline/cmd/git-init:v0.32.0
+      script: |
+        #!/bin/sh
+        git clone "$(params.url)" "$(workspaces.output.path)"
+        cd "$(workspaces.output.path)"
+        git checkout "$(params.revision)"
+
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: buildah
+  namespace: feroz-shah-dev
+spec:
+  workspaces:
+    - name: source
+  params:
+    - name: IMAGE
+      type: string
+      description: Image reference to build/push
+  steps:
+    - name: build
+      image: quay.io/buildah/stable:v1.23.1
+      script: |
+        #!/bin/sh
+        cd "$(workspaces.source.path)"
+        buildah bud -t "$(params.IMAGE)" .
+        buildah push "$(params.IMAGE)"
+
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: openshift-client
+  namespace: feroz-shah-dev
+spec:
+  params:
+    - name: SCRIPT
+      type: string
+      description: OpenShift CLI commands to execute
+  steps:
+    - name: deploy
+      image: quay.io/openshift/origin-cli:latest
+      script: |
+        #!/bin/sh
+        $(params.SCRIPT)
