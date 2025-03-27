@@ -1,0 +1,162 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: git-clone
+spec:
+  workspaces:
+    - name: output
+      description: Directory where the repository will be cloned
+  params:
+    - name: url
+      type: string
+      description: Git repository URL
+    - name: revision
+      type: string
+      description: Git revision (branch/tag/commit)
+      default: "feroz"
+    - name: subdirectory
+      type: string
+      description: Subdirectory within workspace
+      default: ""
+    - name: deleteExisting
+      type: string
+      description: Clean workspace before cloning
+      default: "true"
+  steps:
+    - name: clone
+      image: gcr.io/tekton-releases/github.com/tektoncd/pipeline/cmd/git-init:v0.32.0
+      script: |
+        #!/bin/sh
+        set -ex
+        
+        # Clean workspace if requested
+        if [ "$(params.deleteExisting)" = "true" ]; then
+          rm -rf "$(workspaces.output.path)/$(params.subdirectory)"/* || true
+        fi
+        
+        # Clone repository
+        git clone "$(params.url)" "$(workspaces.output.path)/$(params.subdirectory)"
+        
+        # Checkout specific revision
+        cd "$(workspaces.output.path)/$(params.subdirectory)"
+        git checkout "$(params.revision)"
+
+--- 
+
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: git-commit
+spec:
+  workspaces:
+    - name: output
+      description: Directory containing the repository
+  params:
+    - name: url
+      type: string
+      description: Git repository URL
+    - name: revision
+      type: string
+      description: Branch to commit to
+    - name: IMAGE
+      type: string
+      description: Image URL to update in manifests
+    - name: username
+      type: string
+      description: Git commit username
+    - name: useremail
+      type: string
+      description: Git commit email
+    - name: git-commit-id
+      type: string
+      description: Source commit SHA
+    - name: image-tag
+      type: string
+      description: Tag to use for the image
+    - name: deployment-name
+      type: string
+      description: Name of the deployment to update
+  steps:
+    - name: commit-changes
+      image: alpine/git:latest
+      script: |
+        #!/bin/sh
+        set -ex
+        
+        # Configure git
+        git config --global user.name "$(params.username)"
+        git config --global user.email "$(params.useremail)"
+        
+        # Clone deployment repo
+        git clone "$(params.url)" /tmp/deployment
+        cd /tmp/deployment
+        git checkout "$(params.revision)"
+        
+        # Update manifests (example - customize for your needs)
+        sed -i "s|image:.*|image: $(params.IMAGE):$(params.image-tag)|g" "manifests/$(params.deployment-name).yaml"
+        
+        # Commit and push
+        git add .
+        git commit -m "Update $(params.deployment-name) to $(params.git-commit-id)"
+        git push origin "$(params.revision)"
+
+
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: git-commit
+spec:
+  workspaces:
+    - name: output
+      description: Directory containing the repository
+  params:
+    - name: url
+      type: string
+      description: Git repository URL
+    - name: revision
+      type: string
+      description: Branch to commit to
+    - name: IMAGE
+      type: string
+      description: Image URL to update in manifests
+    - name: username
+      type: string
+      description: Git commit username
+    - name: useremail
+      type: string
+      description: Git commit email
+    - name: git-commit-id
+      type: string
+      description: Source commit SHA
+    - name: image-tag
+      type: string
+      description: Tag to use for the image
+    - name: deployment-name
+      type: string
+      description: Name of the deployment to update
+  steps:
+    - name: commit-changes
+      image: alpine/git:latest
+      script: |
+        #!/bin/sh
+        set -ex
+        
+        # Configure git
+        git config --global user.name "$(params.username)"
+        git config --global user.email "$(params.useremail)"
+        
+        # Clone deployment repo
+        git clone "$(params.url)" /tmp/deployment
+        cd /tmp/deployment
+        git checkout "$(params.revision)"
+        
+        # Update manifests (example - customize for your needs)
+        sed -i "s|image:.*|image: $(params.IMAGE):$(params.image-tag)|g" "manifests/$(params.deployment-name).yaml"
+        
+        # Commit and push
+        git add .
+        git commit -m "Update $(params.deployment-name) to $(params.git-commit-id)"
+        git push origin "$(params.revision)"
+
