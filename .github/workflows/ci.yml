@@ -49,7 +49,7 @@ jobs:
           git config --global user.email ci-bot@argocd.com &&  git config --global user.name ci-bot
           echo "Cloning app repo..."
           git clone https://oauth2:${{ secrets.GH_PAT }}@github.com/fsmutimeer/argo-cd.git
-          cd quarkus-app-deploy
+          cd argo-cd
           echo "Updating image tag in values file..."
           # Using proper sed syntax with escaped slashes
           sed -i "s|tag: .*|tag: ${{ github.sha }}|g" helm/quarkusapp/values.yaml
