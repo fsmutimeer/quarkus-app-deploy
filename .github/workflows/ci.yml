@@ -1,69 +1,82 @@
-## A basic GitHub Actions workflow for your Quarkus application.
-
-name: CI build
+name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build-test:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "building and testing the app ..."
+      - uses: actions/checkout@v3
+      - name: Build and test
+        run: |
+          echo "Building and testing the application..."
+          ./mvnw clean test
+
   docker-build-push:
     runs-on: ubuntu-latest
     needs: build-test
     steps:
-      -
-        name: Checkout code
-        uses: actions/checkout@v2
-      -
-        name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
-      - 
-        name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-      - 
-        name: Login to Docker Hub
-        uses: docker/login-action@v1
+      - uses: actions/checkout@v3
+      - uses: docker/setup-qemu-action@v2
+      - uses: docker/setup-buildx-action@v2
+      - uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
-      - 
-        name: Build and push Docker image
-        uses: docker/build-push-action@v2
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/build-push-action@v4
         with:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ferozshahit22/quarkus-app:${{ github.sha }}
+          tags: |
+            ferozshahit22/quarkus-app:${{ github.sha }}
+            ferozshahit22/quarkus-app:latest
 
-  update-image-tag-in-helm:
+  helm-update:
     runs-on: ubuntu-latest
     needs: docker-build-push
     steps:
-      - run: |
-          git config --global user.email ci-bot@argocd.com
-          git config --global user.name ci-bot
-          echo "Cloning app repo..."
-          git clone https://oauth2:${{ secrets.GH_PAT }}@github.com/fsmutimeer/quarkus-app-deploy.git
-          cd quarkus-app-deploy
-          echo "Updating image tag in values file..."
-          # Using proper sed syntax with escaped slashes
-          sed -i "s|tag: .*|tag: ${{ github.sha }}|g" helm/quarkuapp/values.yaml
+      - name: Checkout Helm repo
+        uses: actions/checkout@v3
+        with:
+          repository: fsmutimeer/quarkus-app-deploy
+          token: ${{ secrets.GH_PAT }}
+          path: helm-repo
+          fetch-depth: 0
+
+      - name: Configure Git
+        working-directory: ./helm-repo
+        run: |
+          git config user.email "ci-bot@argocd.com"
+          git config user.name "ci-bot"
+          git remote set-url origin https://${{ github.actor }}:${{ secrets.GH_PAT }}@github.com/fsmutimeer/quarkus-app-deploy.git
+
+      - name: Update Helm values
+        working-directory: ./helm-repo
+        run: |
+          # Update image tag using yq
+          yq eval '.image.tag = "${{ github.sha }}"' -i helm/quarkuapp/values.yaml
+          
+          # Verify changes
+          echo "Updated values.yaml content:"
+          cat helm/quarkuapp/values.yaml
+          
+          # Commit and push
           git add helm/quarkuapp/values.yaml
-          git commit -m "Update image tag to ${{ github.sha }} [skip ci]"
-          git push
-  add_labels:
-    runs-on : ubuntu-latest
-    needs: update-image-tag-in-helm
+          git commit -m "CI: Update image tag to ${{ github.sha }} [skip ci]"
+          git pull --rebase origin main
+          git push origin HEAD:main
+
+  add-labels:
+    runs-on: ubuntu-latest
+    needs: helm-update
+    if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v2
       - uses: actions-ecosystem/action-add-labels@v1
         with:
-          labels: |
-            preview
-
+          labels: "preview"
+          github_token: ${{ github.token }}
