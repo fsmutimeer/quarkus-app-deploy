@@ -37,7 +37,7 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: .
-          file: ../../Dockerfile
+          file: ./Dockerfile
           push: true
           tags: fsmutimeer/quarkus-app-deploy:${{ github.sha }}
   update-image-tag-in-helm:
