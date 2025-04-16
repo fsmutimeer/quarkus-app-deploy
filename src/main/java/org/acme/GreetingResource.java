@@ -13,4 +13,11 @@ public class GreetingResource {
     public String hello() {
         return "Hello from Quarkus REST";
     }
+
+    @GET
+    @Path("/greet")
+    @Produces(MediaType.TEXT_PLAIN)
+    public String greet() {
+        return "Hello from Quarkus REST";
+    }
 }
