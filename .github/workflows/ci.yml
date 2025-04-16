@@ -48,7 +48,7 @@ jobs:
       - run: |
           git config --global user.email ci-bot@argocd.com &&  git config --global user.name ci-bot
           echo "Cloning app repo..."
-          git clone https://oauth2:${{ secrets.GH_PAT }}@github.com/fsmutimeer/quarkus-app-deploy.git
+          git clone https://oauth2:${{ secrets.GH_PAT }}@github.com/fsmutimeer/argo-cd.git
           cd quarkus-app-deploy
           echo "Updating image tag in values file..."
           # Using proper sed syntax with escaped slashes
